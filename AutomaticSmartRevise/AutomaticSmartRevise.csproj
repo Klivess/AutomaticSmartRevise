@@ -9,14 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AForge" Version="2.2.5" />
     <PackageReference Include="AForge.Imaging" Version="2.2.5" />
+    <PackageReference Include="AForge.Math" Version="2.2.5" />
     <PackageReference Include="Emgu.CV" Version="4.8.1.5350" />
     <PackageReference Include="LLamaSharp" Version="0.10.0" />
     <PackageReference Include="LLamaSharp.Backend.Cuda12" Version="0.10.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="NuGet.Tessnet2" Version="1.1.1" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.2" />
-    <PackageReference Include="Tesseract.Data.English" Version="4.0.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
   <ItemGroup>

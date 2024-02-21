@@ -40,7 +40,7 @@ namespace AutomaticSmartRevise2
         public static string tessDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessData");
         public static string tessDataEnglish = Path.Combine(tessDataDirectory, "eng.traineddata");
 
-        const int imageScalar = 20;
+        const int imageScalar = 10;
 
         public void Prerequisites()
         {
