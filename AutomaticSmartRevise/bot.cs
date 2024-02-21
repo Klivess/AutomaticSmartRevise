@@ -18,6 +18,7 @@ using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 using AForge.Imaging.Filters;
 using Emgu.CV.OCR;
+using tessnet2;
 
 namespace AutomaticSmartRevise2
 {
@@ -39,6 +40,8 @@ namespace AutomaticSmartRevise2
         public static string tessDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessData");
         public static string tessDataEnglish = Path.Combine(tessDataDirectory, "eng.traineddata");
 
+        const int imageScalar = 20;
+
         public void Prerequisites()
         {
             Directory.CreateDirectory(tessDataDirectory);
@@ -53,21 +56,24 @@ namespace AutomaticSmartRevise2
         public void blabblahblah()
         {
             Prerequisites();
-
+            Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write("Enter how many questions you want to solve: ");
             int count = int.Parse(Console.ReadLine());
-            Console.WriteLine("Starting in ten seconds, make sure that your main monitor is 1920x1080 and that the smart revise webpage is open at 100% zoom and " +
+            Console.WriteLine("Starting in five seconds, make sure that your main monitor is 1920x1080 and that the smart revise webpage is open at 100% zoom and " +
                 "in the quiz section already. Do not touch your mouse until this is finished as the application will take control of your computer for you.");
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
             string tempImages = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tempImages");
             Directory.CreateDirectory(tempImages);
             for(int i = 0; i<count; i++)
             {
-
+                Console.ForegroundColor = ConsoleColor.Green;
                 //Measure time taken to solve;
                 Stopwatch st = Stopwatch.StartNew();
-                string tempPath = Path.Combine(tempImages, thiranya.Next(999).ToString());
+                string tempPath = Path.Combine(tempImages, thiranya.Next(99999).ToString());
                 Directory.CreateDirectory(tempPath);
+
+                Console.WriteLine("Scanning screen..");
+
                 var questiondata = SaveScreenshotsOfQuestionAndAnswers(tempPath);
 
                 string question = GetTextFromImage(questiondata[0]);
@@ -76,6 +82,7 @@ namespace AutomaticSmartRevise2
                 string answer3 = GetTextFromImage(questiondata[3]);
                 string answer4 = GetTextFromImage(questiondata[4]);
 
+                Console.WriteLine("Solving question: " + question);
                 var formatted = FormatRequest(question, answer1, answer2, answer3, answer4);
                 var answer = SendLLamaRequest(formatted).Result;
                 Console.WriteLine($"Answer: {answer} Time to solve: {st.Elapsed.Seconds} seconds");
@@ -84,26 +91,31 @@ namespace AutomaticSmartRevise2
                 {
                     case "A":
                         SelectAnswer(SelectOption.Answer1);
+                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
+                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "B":
                         SelectAnswer(SelectOption.Answer2);
+                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
+                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "C":
                         SelectAnswer(SelectOption.Answer3);
+                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
+                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "D":
                         SelectAnswer(SelectOption.Answer4);
+                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
+                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     default:
                         Console.WriteLine("Couldn't solve, retrying.");
                         i = i - 1;
                         break;
                 }
-                Task.Delay(2000).Wait();
-                SelectAnswer(SelectOption.NextQuestion);
-
-                Task.Delay(Math.Clamp(5 - st.Elapsed.Seconds, 0, 5));
             }
+            Directory.Delete(tempImages, true);
         }
 
         public void SelectAnswer(SelectOption option)
@@ -190,17 +202,24 @@ namespace AutomaticSmartRevise2
             Bitmap answer3ImageCrop = screenshot.Clone(answer3CropArea, PixelFormat.Format32bppRgb);
             Bitmap answer4ImageCrop = screenshot.Clone(answer4CropArea, PixelFormat.Format32bppRgb);
 
+            //Upscale by 20x to improve emgu enhancement
+            Bitmap questionImageCropResized = ResizeImage(questionImageCrop, questionImageCrop.Width * imageScalar, questionImageCrop.Height * imageScalar);
+            Bitmap answer1ImageCropResized = ResizeImage(answer1ImageCrop, answer1ImageCrop.Width * imageScalar, answer1ImageCrop.Height * imageScalar);
+            Bitmap answer2ImageCropResized = ResizeImage(answer2ImageCrop, answer2ImageCrop.Width * imageScalar, answer2ImageCrop.Height * imageScalar);
+            Bitmap answer3ImageCropResized = ResizeImage(answer3ImageCrop, answer3ImageCrop.Width * imageScalar, answer3ImageCrop.Height * imageScalar);
+            Bitmap answer4ImageCropResized = ResizeImage(answer4ImageCrop, answer4ImageCrop.Width * imageScalar, answer4ImageCrop.Height * imageScalar);
+
             string questionImagePath = Path.Combine(dirPath, "question.png");
             string answer1ImagePath = Path.Combine(dirPath, "answer1.png");
             string answer2ImagePath = Path.Combine(dirPath, "answer2.png");
             string answer3ImagePath = Path.Combine(dirPath, "answer3.png");
             string answer4ImagePath = Path.Combine(dirPath, "answer4.png");
 
-            questionImageCrop.Save(questionImagePath, ImageFormat.Png);
-            answer1ImageCrop.Save(answer1ImagePath, ImageFormat.Png);
-            answer2ImageCrop.Save(answer2ImagePath, ImageFormat.Png);
-            answer3ImageCrop.Save(answer3ImagePath, ImageFormat.Png);
-            answer4ImageCrop.Save(answer4ImagePath, ImageFormat.Png);
+            questionImageCropResized.Save(questionImagePath, ImageFormat.Png);
+            answer1ImageCropResized.Save(answer1ImagePath, ImageFormat.Png);
+            answer2ImageCropResized.Save(answer2ImagePath, ImageFormat.Png);
+            answer3ImageCropResized.Save(answer3ImagePath, ImageFormat.Png);
+            answer4ImageCropResized.Save(answer4ImagePath, ImageFormat.Png);
 
             screenshotPaths.Add(EmguEnhancement(questionImagePath));
             screenshotPaths.Add(EmguEnhancement(answer1ImagePath));
@@ -224,10 +243,11 @@ namespace AutomaticSmartRevise2
             CvInvoke.AdaptiveThreshold(image, image, 255, AdaptiveThresholdType.MeanC, ThresholdType.Binary, 11, 2);
 
             // Invert the image to make text white and background black
-            CvInvoke.BitwiseNot(image, image);
+            //CvInvoke.BitwiseNot(image, image);
 
             string outputPath = Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path) + "enhanced.png");
             image.Save(outputPath);
+            image.Dispose();
             return outputPath;
         }
 
@@ -257,19 +277,20 @@ namespace AutomaticSmartRevise2
             Bitmap image = new Bitmap(path);
             tessnet2.Tesseract ocr = new tessnet2.Tesseract();
             ocr.SetVariable("tessedit_char_whitelist", "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,$-/#&=()\"':?"); // Accepted characters
+            ocr.SetVariable("preserve_interword_spaces", "true");
             ocr.Init(tessDataDirectory, "eng", false); // Directory of your tessdata folder
             List<tessnet2.Word> result = ocr.DoOCR(image, System.Drawing.Rectangle.Empty);
             string Results = "";
             foreach (tessnet2.Word word in result)
             {
-                Results += word.Text;
+                Results += word.Text+" ";
             }
             return Results;
         }
 
         public string FormatRequest(string question, string answer1, string answer2, string answer3, string answer4)
         {
-            string newRequest = $"Answer the following multiple choice question with the corresponding letter. Encapsulate your letter answer in parenthesis.\n\nQuestion: {question}\n\n" +
+            string newRequest = $"Answer the following multiple choice question with the corresponding letter. Encapsulate your letter answer in parenthesis. Limit your response to one letter.\n\nQuestion: {question}\n\n" +
                 $"A:{answer1}\nB:{answer2}\nC:{answer3}\nD:{answer4}";
             return newRequest;
         }
@@ -298,6 +319,28 @@ namespace AutomaticSmartRevise2
             }
         }
 
+        public static System.Drawing.Bitmap ResizeImage(System.Drawing.Image image, int width, int height)
+        {
+            //a holder for the result
+            Bitmap result = new Bitmap(width, height);
+            //set the resolutions the same to avoid cropping due to resolution differences
+            result.SetResolution(image.HorizontalResolution, image.VerticalResolution);
+
+            //use a graphics object to draw the resized image into the bitmap
+            using (Graphics graphics = Graphics.FromImage(result))
+            {
+                //set the resize quality modes to high quality
+                graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
+                graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+                //draw the image into the target bitmap
+                graphics.DrawImage(image, 0, 0, result.Width, result.Height);
+            }
+
+            //return the resulting bitmap
+            return result;
+        }
+
         public async Task<string> SendLLamaRequest(string message)
         {
             //leech off of llama2.ai/api
@@ -311,17 +354,28 @@ namespace AutomaticSmartRevise2
             message1.Headers.Add("method", "POST");
             message1.Headers.Add("Accept", "*/*");
             LLamaPayload payload = new();
-            payload.prompt = $"<s>[INST] <<SYS>>\r\nYou are a helpful assistant.\r\n<</SYS>>\r\n\r\n{message} [/INST]\r\n";
+            payload.prompt = $"<s>[INST] <<SYS>>\r\nYou are a helpful assistant which only responds in single letters.\r\n<</SYS>>\r\n\r\n{message} [/INST]\r\n";
             message1.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8);
             var response = await client.SendAsync(message1);
             var b = response.StatusCode;
             var formattedstring = await response.Content.ReadAsStringAsync();
             try
             {
+                formattedstring = formattedstring.Remove(0, formattedstring.IndexOf("("));
                 formattedstring = formattedstring.Remove(formattedstring.IndexOf(")"));
+                formattedstring = formattedstring.Replace("(", string.Empty).Trim();
+                formattedstring = formattedstring[0].ToString();
             }
             catch (Exception ex) { }
-            return formattedstring.Replace("(", string.Empty).Trim();
+            if(formattedstring.Length == 0) {
+                Console.WriteLine("Failed to parse answer from solving, retrying.");
+                //recursion might result in stack overflow :(
+                return await SendLLamaRequest(message);
+            }
+            else
+            {
+                return formattedstring.Replace("(", string.Empty).Trim()[0].ToString();
+            }
         }
     }
 }
