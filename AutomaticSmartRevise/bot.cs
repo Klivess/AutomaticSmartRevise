@@ -19,6 +19,7 @@ using Emgu.CV.Structure;
 using AForge.Imaging.Filters;
 using Emgu.CV.OCR;
 using tessnet2;
+using System.IO.Compression;
 
 namespace AutomaticSmartRevise2
 {
@@ -38,19 +39,21 @@ namespace AutomaticSmartRevise2
         HttpClient client = new HttpClient();
         Random thiranya = new();
         public static string tessDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessData");
-        public static string tessDataEnglish = Path.Combine(tessDataDirectory, "eng.traineddata");
 
         const int imageScalar = 10;
 
         public void Prerequisites()
         {
-            Directory.CreateDirectory(tessDataDirectory);
-            if (File.Exists(tessDataEnglish) != true)
+            if (File.Exists(Path.Combine(tessDataDirectory, "eng.unicharset")) != true)
             {
                 Console.WriteLine("TessData not found, downloading for you...");
                 WebClient wc = new();
-                //wc.DownloadFile("blob:https://github.com/07e0b487-191f-4e5c-9635-feca4a56286a", tessDataEnglish);
-                Console.WriteLine("TessData NOT downloaded.");
+                string zipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdataZip.zip");
+                //temporary discord hosting
+                wc.DownloadFile("https://cdn.discordapp.com/attachments/840827592177221652/1209946389271019560/tessData.zip?ex=65e8c562&is=65d65062&hm=487d97d38fc1464fa89634ba5a018b89bb68e7fac6a4b98d6752c4e61e1676bf&", zipPath);
+                ZipFile.ExtractToDirectory(zipPath, AppDomain.CurrentDomain.BaseDirectory, true);
+                File.Delete(zipPath);
+                Console.WriteLine("TessData downloaded.");
             }
         }
         public void blabblahblah()
@@ -114,8 +117,18 @@ namespace AutomaticSmartRevise2
                         i = i - 1;
                         break;
                 }
+                //to prevent memory leak
+                GC.Collect();
+                Directory.Delete(tempPath, true);
             }
-            Directory.Delete(tempImages, true);
+            try
+            {
+                Directory.Delete(tempImages, true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Couldn't delete temporary images, " + ex.Message + " - please delete yourself.");
+            }
         }
 
         public void SelectAnswer(SelectOption option)
@@ -221,6 +234,20 @@ namespace AutomaticSmartRevise2
             answer3ImageCropResized.Save(answer3ImagePath, ImageFormat.Png);
             answer4ImageCropResized.Save(answer4ImagePath, ImageFormat.Png);
 
+            questionImageCrop.Dispose();
+            answer2ImageCrop.Dispose();
+            answer3ImageCrop.Dispose();
+            answer4ImageCrop.Dispose();
+            answer1ImageCrop.Dispose();
+
+            //Upscale by 20x to improve emgu enhancement
+            questionImageCropResized.Dispose();
+            answer1ImageCropResized.Dispose();
+            answer2ImageCropResized.Dispose();
+            answer3ImageCropResized.Dispose();
+            answer4ImageCropResized.Dispose();
+
+
             screenshotPaths.Add(EmguEnhancement(questionImagePath));
             screenshotPaths.Add(EmguEnhancement(answer1ImagePath));
             screenshotPaths.Add(EmguEnhancement(answer2ImagePath));
@@ -233,6 +260,7 @@ namespace AutomaticSmartRevise2
 
         public static string EmguEnhancement(string path)
         {
+            return path;
             //read in grayscale
             Mat image = CvInvoke.Imread(path, ImreadModes.Grayscale);
 
@@ -335,6 +363,7 @@ namespace AutomaticSmartRevise2
                 graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
                 //draw the image into the target bitmap
                 graphics.DrawImage(image, 0, 0, result.Width, result.Height);
+                graphics.Dispose();
             }
 
             //return the resulting bitmap
@@ -374,7 +403,7 @@ namespace AutomaticSmartRevise2
             }
             else
             {
-                return formattedstring.Replace("(", string.Empty).Trim()[0].ToString();
+                return formattedstring.Replace("(", string.Empty).Trim()[0].ToString().ToUpper();
             }
         }
     }

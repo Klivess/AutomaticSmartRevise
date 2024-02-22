@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Platforms>AnyCPU;x86</Platforms>
+    <PackageOutputPath>Output\</PackageOutputPath>
+    <BaseOutputPath>Output\</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
