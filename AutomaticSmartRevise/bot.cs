@@ -20,6 +20,7 @@ using AForge.Imaging.Filters;
 using Emgu.CV.OCR;
 using tessnet2;
 using System.IO.Compression;
+using System.Security.Cryptography;
 
 namespace AutomaticSmartRevise2
 {
@@ -36,9 +37,14 @@ namespace AutomaticSmartRevise2
 #pragma warning disable CA1416 // Validate platform compatibility
     public class bot
     {
+        int total = 0;
+        int correct = 0;
+        int incorrect;
+
         HttpClient client = new HttpClient();
         Random thiranya = new();
         public static string tessDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessData");
+        public static string tempImages = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tempImages");
 
         const int imageScalar = 10;
 
@@ -65,7 +71,6 @@ namespace AutomaticSmartRevise2
             Console.WriteLine("Starting in five seconds, make sure that your main monitor is 1920x1080 and that the smart revise webpage is open at 100% zoom and " +
                 "in the quiz section already. Do not touch your mouse until this is finished as the application will take control of your computer for you.");
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
-            string tempImages = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tempImages");
             Directory.CreateDirectory(tempImages);
             for(int i = 0; i<count; i++)
             {
@@ -85,51 +90,67 @@ namespace AutomaticSmartRevise2
                 string answer3 = GetTextFromImage(questiondata[3]);
                 string answer4 = GetTextFromImage(questiondata[4]);
 
-                Console.WriteLine("Solving question: " + question);
+                Console.WriteLine($"Solving question: {question}\nAnswer 1: {answer1}\nAnswer 2: {answer2}\nAnswer 3: {answer3}\nAnswer 4: {answer4}");
                 var formatted = FormatRequest(question, answer1, answer2, answer3, answer4);
                 var answer = SendLLamaRequest(formatted).Result;
                 Console.WriteLine($"Answer: {answer} Time to solve: {st.Elapsed.Seconds} seconds");
-
+                SelectOption option = new SelectOption();
                 switch (answer)
                 {
                     case "A":
+                        option = SelectOption.Answer1;
                         SelectAnswer(SelectOption.Answer1);
-                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
-                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "B":
+                        option = SelectOption.Answer2;
                         SelectAnswer(SelectOption.Answer2);
-                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
-                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "C":
+                        option = SelectOption.Answer3;
                         SelectAnswer(SelectOption.Answer3);
-                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
-                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     case "D":
+                        option = SelectOption.Answer4;
                         SelectAnswer(SelectOption.Answer4);
-                        Task.Delay(TimeSpan.FromSeconds(Math.Clamp(8 - st.Elapsed.Seconds, 0, 8) + 1.5)).Wait();
-                        SelectAnswer(SelectOption.NextQuestion);
                         break;
                     default:
                         Console.WriteLine("Couldn't solve, retrying.");
                         i = i - 1;
                         break;
                 }
-                //to prevent memory leak
-                GC.Collect();
-                Directory.Delete(tempPath, true);
+                if(option!=new SelectOption())
+                {
+                    Task.Delay(TimeSpan.FromSeconds(Math.Clamp(3 - st.Elapsed.Seconds, 0, 3) + 1)).Wait();
+                    bool answerResult = CheckIfAnswerIsCorrect(option);
+                    Console.WriteLine("Answer is " + (answerResult ? "correct." : "incorrect."));
+                    if (answerResult)
+                        correct++;
+                    else
+                        incorrect++;
+                    total++;
+                    PrintCounter();
+                    SelectAnswer(SelectOption.NextQuestion);
+                    //to prevent memory leak
+                    GC.Collect();
+                    //Directory.Delete(tempPath, true);
+                }
             }
             try
             {
-                Directory.Delete(tempImages, true);
+                //Directory.Delete(tempImages, true);
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Couldn't delete temporary images, " + ex.Message + " - please delete yourself.");
             }
         }
+
+        public void PrintCounter()
+        {
+            Console.ForegroundColor = ConsoleColor.DarkMagenta;
+            Console.WriteLine($"Total questions: {total} Total Correct: {correct} Total Incorrect: {incorrect} %Correct: {Math.Round(d: (correct / total) * 100)}");
+        }
+
 
         public void SelectAnswer(SelectOption option)
         {
@@ -180,8 +201,67 @@ namespace AutomaticSmartRevise2
             }
         }
 
-        public string[] SaveScreenshotsOfQuestionAndAnswers(string dirPath)
+        public bool CheckIfAnswerIsCorrect(SelectOption option)
         {
+            string tempPath = Path.Combine(tempImages, thiranya.Next(99999).ToString());
+            var answers = SaveScreenshotsOfQuestionAndAnswers(tempPath);
+            if (option == SelectOption.Answer1)
+            {
+                Color avgColor = AverageColorOfImage(answers[1]);
+                return avgColor.G > 150;
+            }
+            else if (option == SelectOption.Answer2)
+            {
+                Color avgColor = AverageColorOfImage(answers[2]);
+                return avgColor.G > 150;
+            }
+            else if (option == SelectOption.Answer3)
+            {
+                Color avgColor = AverageColorOfImage(answers[3]);
+                return avgColor.G > 150;
+
+            }
+            else if (option == SelectOption.Answer4)
+            {
+                Color avgColor = AverageColorOfImage(answers[4]);
+                return avgColor.G > 150;
+            }
+            //it should never get here
+            return false;
+        }
+
+        public Color AverageColorOfImage(string path)
+        {
+            FileStream fs = new FileStream(path, FileMode.Open);
+            Bitmap input = (Bitmap)Bitmap.FromStream(fs);
+            Bitmap greyscale = new Bitmap(input.Width, input.Height);
+            KeyValuePair<float, float> aTotal = new(0, 0);
+            KeyValuePair<float, float> rTotal = new(0, 0);
+            KeyValuePair<float, float> gTotal = new(0, 0);
+            KeyValuePair<float, float> bTotal = new(0, 0);
+            for (int x = 0; x < input.Width; x++)
+            {
+                for (int y = 0; y < input.Height; y++)
+                {
+                    Color pixelColor = input.GetPixel(x, y);
+                    aTotal = new(aTotal.Key + pixelColor.A, aTotal.Value + 1);
+                    rTotal = new(rTotal.Key + pixelColor.R, rTotal.Value+1);
+                    gTotal = new(gTotal.Key + pixelColor.G, gTotal.Value + 1);
+                    bTotal = new(bTotal.Key + pixelColor.B, bTotal.Value + 1);
+                }
+            }
+            //average it out
+            Color value = new Color();
+            value = Color.FromArgb((int)Math.Round(aTotal.Key / aTotal.Value),
+                Math.Clamp((int)Math.Round(rTotal.Key / rTotal.Value), 0, 255),
+                Math.Clamp((int)Math.Round(gTotal.Key / gTotal.Value), 0, 255),
+                Math.Clamp((int)Math.Round(bTotal.Key / bTotal.Value), 0, 255));
+            return value;
+        }
+
+        public string[] SaveScreenshotsOfQuestionAndAnswers(string dirPath, bool enhancement = true)
+        {
+            Directory.CreateDirectory(dirPath);
             List<string> screenshotPaths= new List<string>();
             //Question:
             //  Y: 345-385 X:80-920 
@@ -215,12 +295,15 @@ namespace AutomaticSmartRevise2
             Bitmap answer3ImageCrop = screenshot.Clone(answer3CropArea, PixelFormat.Format32bppRgb);
             Bitmap answer4ImageCrop = screenshot.Clone(answer4CropArea, PixelFormat.Format32bppRgb);
 
-            //Upscale by 20x to improve emgu enhancement
-            Bitmap questionImageCropResized = ResizeImage(questionImageCrop, questionImageCrop.Width * imageScalar, questionImageCrop.Height * imageScalar);
-            Bitmap answer1ImageCropResized = ResizeImage(answer1ImageCrop, answer1ImageCrop.Width * imageScalar, answer1ImageCrop.Height * imageScalar);
-            Bitmap answer2ImageCropResized = ResizeImage(answer2ImageCrop, answer2ImageCrop.Width * imageScalar, answer2ImageCrop.Height * imageScalar);
-            Bitmap answer3ImageCropResized = ResizeImage(answer3ImageCrop, answer3ImageCrop.Width * imageScalar, answer3ImageCrop.Height * imageScalar);
-            Bitmap answer4ImageCropResized = ResizeImage(answer4ImageCrop, answer4ImageCrop.Width * imageScalar, answer4ImageCrop.Height * imageScalar);
+            if (enhancement)
+            {
+                //Upscale by 20x to improve OCR
+                questionImageCrop = ResizeImage(questionImageCrop, questionImageCrop.Width * imageScalar, questionImageCrop.Height * imageScalar);
+                answer1ImageCrop = ResizeImage(answer1ImageCrop, answer1ImageCrop.Width * imageScalar, answer1ImageCrop.Height * imageScalar);
+                answer2ImageCrop = ResizeImage(answer2ImageCrop, answer2ImageCrop.Width * imageScalar, answer2ImageCrop.Height * imageScalar);
+                answer3ImageCrop = ResizeImage(answer3ImageCrop, answer3ImageCrop.Width * imageScalar, answer3ImageCrop.Height * imageScalar);
+                answer4ImageCrop = ResizeImage(answer4ImageCrop, answer4ImageCrop.Width * imageScalar, answer4ImageCrop.Height * imageScalar);
+            }
 
             string questionImagePath = Path.Combine(dirPath, "question.png");
             string answer1ImagePath = Path.Combine(dirPath, "answer1.png");
@@ -228,39 +311,33 @@ namespace AutomaticSmartRevise2
             string answer3ImagePath = Path.Combine(dirPath, "answer3.png");
             string answer4ImagePath = Path.Combine(dirPath, "answer4.png");
 
-            questionImageCropResized.Save(questionImagePath, ImageFormat.Png);
-            answer1ImageCropResized.Save(answer1ImagePath, ImageFormat.Png);
-            answer2ImageCropResized.Save(answer2ImagePath, ImageFormat.Png);
-            answer3ImageCropResized.Save(answer3ImagePath, ImageFormat.Png);
-            answer4ImageCropResized.Save(answer4ImagePath, ImageFormat.Png);
+            questionImageCrop.Save(questionImagePath, ImageFormat.Png);
+            answer1ImageCrop.Save(answer1ImagePath, ImageFormat.Png);
+            answer2ImageCrop.Save(answer2ImagePath, ImageFormat.Png);
+            answer3ImageCrop.Save(answer3ImagePath, ImageFormat.Png);
+            answer4ImageCrop.Save(answer4ImagePath, ImageFormat.Png);
 
+            //trying to save memory
             questionImageCrop.Dispose();
             answer2ImageCrop.Dispose();
             answer3ImageCrop.Dispose();
             answer4ImageCrop.Dispose();
             answer1ImageCrop.Dispose();
 
-            //Upscale by 20x to improve emgu enhancement
-            questionImageCropResized.Dispose();
-            answer1ImageCropResized.Dispose();
-            answer2ImageCropResized.Dispose();
-            answer3ImageCropResized.Dispose();
-            answer4ImageCropResized.Dispose();
-
-
-            screenshotPaths.Add(EmguEnhancement(questionImagePath));
-            screenshotPaths.Add(EmguEnhancement(answer1ImagePath));
-            screenshotPaths.Add(EmguEnhancement(answer2ImagePath));
-            screenshotPaths.Add(EmguEnhancement(answer3ImagePath));
-            screenshotPaths.Add(EmguEnhancement(answer4ImagePath));
-
+            if (enhancement)
+            {
+                screenshotPaths.Add((questionImagePath));
+                screenshotPaths.Add(EmguEnhancement(answer1ImagePath));
+                screenshotPaths.Add(EmguEnhancement(answer2ImagePath));
+                screenshotPaths.Add(EmguEnhancement(answer3ImagePath));
+                screenshotPaths.Add(EmguEnhancement(answer4ImagePath));
+            }
 
             return screenshotPaths.ToArray();
         }
 
         public static string EmguEnhancement(string path)
         {
-            return path;
             //read in grayscale
             Mat image = CvInvoke.Imread(path, ImreadModes.Grayscale);
 
@@ -309,9 +386,18 @@ namespace AutomaticSmartRevise2
             ocr.Init(tessDataDirectory, "eng", false); // Directory of your tessdata folder
             List<tessnet2.Word> result = ocr.DoOCR(image, System.Drawing.Rectangle.Empty);
             string Results = "";
+            //Try again if read fails
             foreach (tessnet2.Word word in result)
             {
                 Results += word.Text+" ";
+            }
+            result.Clear();
+            ocr.Clear();
+            ocr.Dispose();
+            image.Dispose();
+            if (Results.Trim() == "~")
+            {
+                //return GetTextFromImage(path);
             }
             return Results;
         }
