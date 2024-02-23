@@ -46,6 +46,8 @@ namespace AutomaticSmartRevise2
         public static string tessDataDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessData");
         public static string tempImages = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tempImages");
 
+        string previousQuestion = "";
+
         const int imageScalar = 10;
 
         public void Prerequisites()
@@ -85,6 +87,13 @@ namespace AutomaticSmartRevise2
                 var questiondata = SaveScreenshotsOfQuestionAndAnswers(tempPath);
 
                 string question = GetTextFromImage(questiondata[0]);
+                if(question == previousQuestion)
+                {
+                    Directory.Delete(tempPath, true);
+                    Task.Delay(1000);
+                    questiondata = SaveScreenshotsOfQuestionAndAnswers(tempPath);
+                    question = GetTextFromImage(questiondata[0]);
+                }
                 string answer1 = GetTextFromImage(questiondata[1]);
                 string answer2 = GetTextFromImage(questiondata[2]);
                 string answer3 = GetTextFromImage(questiondata[3]);
@@ -118,7 +127,7 @@ namespace AutomaticSmartRevise2
                         i = i - 1;
                         break;
                 }
-                if(option!=new SelectOption())
+                if (option != new SelectOption())
                 {
                     Task.Delay(TimeSpan.FromSeconds(Math.Clamp(3 - st.Elapsed.Seconds, 0, 3) + 1)).Wait();
                     bool answerResult = CheckIfAnswerIsCorrect(option);
@@ -132,12 +141,12 @@ namespace AutomaticSmartRevise2
                     SelectAnswer(SelectOption.NextQuestion);
                     //to prevent memory leak
                     GC.Collect();
-                    //Directory.Delete(tempPath, true);
+                    Directory.Delete(tempPath, true);
                 }
             }
             try
             {
-                //Directory.Delete(tempImages, true);
+                Directory.Delete(tempImages, true);
             }
             catch (Exception ex)
             {
@@ -204,7 +213,7 @@ namespace AutomaticSmartRevise2
         public bool CheckIfAnswerIsCorrect(SelectOption option)
         {
             string tempPath = Path.Combine(tempImages, thiranya.Next(99999).ToString());
-            var answers = SaveScreenshotsOfQuestionAndAnswers(tempPath);
+            var answers = SaveScreenshotsOfQuestionAndAnswers(tempPath, false);
             if (option == SelectOption.Answer1)
             {
                 Color avgColor = AverageColorOfImage(answers[1]);
@@ -252,10 +261,11 @@ namespace AutomaticSmartRevise2
             }
             //average it out
             Color value = new Color();
-            value = Color.FromArgb((int)Math.Round(aTotal.Key / aTotal.Value),
-                Math.Clamp((int)Math.Round(rTotal.Key / rTotal.Value), 0, 255),
-                Math.Clamp((int)Math.Round(gTotal.Key / gTotal.Value), 0, 255),
-                Math.Clamp((int)Math.Round(bTotal.Key / bTotal.Value), 0, 255));
+            value = Color.FromArgb(Math.Clamp((int)(aTotal.Key / aTotal.Value), 0, 255),
+                Math.Clamp((int)(rTotal.Key / rTotal.Value), 0, 255),
+                Math.Clamp((int)(gTotal.Key / gTotal.Value), 0, 255),
+                Math.Clamp((int)(bTotal.Key / bTotal.Value), 0, 255));
+            fs.Close();
             return value;
         }
 
@@ -332,6 +342,14 @@ namespace AutomaticSmartRevise2
                 screenshotPaths.Add(EmguEnhancement(answer3ImagePath));
                 screenshotPaths.Add(EmguEnhancement(answer4ImagePath));
             }
+            else
+            {
+                screenshotPaths.Add((questionImagePath));
+                screenshotPaths.Add((answer1ImagePath));
+                screenshotPaths.Add((answer2ImagePath));
+                screenshotPaths.Add((answer3ImagePath));
+                screenshotPaths.Add((answer4ImagePath));
+            }
 
             return screenshotPaths.ToArray();
         }
@@ -342,13 +360,13 @@ namespace AutomaticSmartRevise2
             Mat image = CvInvoke.Imread(path, ImreadModes.Grayscale);
 
             //apply Gaussian blur to smooth the image
-            CvInvoke.GaussianBlur(image, image, new Size(1, 1), (int)BorderType.Default);
+            //CvInvoke.GaussianBlur(image, image, new Size(1, 1), (int)BorderType.Default);
 
             //apply adaptive thresholding to binarize the image
-            CvInvoke.AdaptiveThreshold(image, image, 255, AdaptiveThresholdType.MeanC, ThresholdType.Binary, 11, 2);
+            CvInvoke.Threshold(image, image, 210, 255, ThresholdType.Binary);
 
             // Invert the image to make text white and background black
-            //CvInvoke.BitwiseNot(image, image);
+            CvInvoke.BitwiseNot(image, image);
 
             string outputPath = Path.Combine(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path) + "enhanced.png");
             image.Save(outputPath);
@@ -425,7 +443,7 @@ namespace AutomaticSmartRevise2
                 audio = null;
                 image = null;
                 maxTokens = 800;
-                model = "meta/llama-2-70b-chat";
+                model = "meta/llama-2-13b-chat";
                 prompt = "";
                 systemPrompt = "You are a helpful assistant.";
                 temperature = 0.75f;
