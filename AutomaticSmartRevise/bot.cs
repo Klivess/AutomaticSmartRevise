@@ -1,29 +1,16 @@
-﻿using LLama.Common;
-using LLama;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using Newtonsoft.Json;
 using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
-using LLama.Native;
 using System.Diagnostics;
-using Microsoft.Extensions.Logging;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Net;
 using Emgu.CV;
 using Emgu.CV.CvEnum;
-using Emgu.CV.Structure;
-using AForge.Imaging.Filters;
-using Emgu.CV.OCR;
-using tessnet2;
 using System.IO.Compression;
-using System.Security.Cryptography;
 
 namespace AutomaticSmartRevise2
 {
+
     public enum SelectOption
     {
         Question,
@@ -37,6 +24,10 @@ namespace AutomaticSmartRevise2
 #pragma warning disable CA1416 // Validate platform compatibility
     public class bot
     {
+        (int Width, int Height) screenWidth;
+        public int widthScalar;
+        public int heightScalar;
+
         int total = 0;
         int correct = 0;
         int incorrect;
@@ -52,6 +43,7 @@ namespace AutomaticSmartRevise2
 
         public void Prerequisites()
         {
+            Console.WriteLine($"Checking prerequisites.");
             if (File.Exists(Path.Combine(tessDataDirectory, "eng.unicharset")) != true)
             {
                 Console.WriteLine("TessData not found, downloading for you...");
@@ -66,12 +58,18 @@ namespace AutomaticSmartRevise2
         }
         public void blabblahblah()
         {
+            
             Prerequisites();
+            SetResolutionScalars();
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.Write("Enter how many questions you want to solve: ");
             int count = int.Parse(Console.ReadLine());
-            Console.WriteLine("Starting in five seconds, make sure that your main monitor is 1920x1080 and that the smart revise webpage is open at 100% zoom and " +
-                "in the quiz section already. Do not touch your mouse until this is finished as the application will take control of your computer for you.");
+            Console.WriteLine("Starting in five seconds, " +
+                "make sure that your main monitor is 1920x1080 " +
+                "and that the smart revise webpage is open at 100% zoom and " +
+                "in the quiz section already. Do not touch your mouse until " +
+                "this is finished as the application will take " +
+                "control of your computer for you.");
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
             Directory.CreateDirectory(tempImages);
             for(int i = 0; i<count; i++)
@@ -90,7 +88,7 @@ namespace AutomaticSmartRevise2
                 if(question == previousQuestion)
                 {
                     Directory.Delete(tempPath, true);
-                    Task.Delay(1000);
+                    Task.Delay(1000).Wait();
                     questiondata = SaveScreenshotsOfQuestionAndAnswers(tempPath);
                     question = GetTextFromImage(questiondata[0]);
                 }
@@ -166,42 +164,42 @@ namespace AutomaticSmartRevise2
             switch(option)
             {
                 case SelectOption.Question:
-                    MouseInterface.SetCursorPosition(500, 360);
+                    MouseInterface.SetCursorPosition(500*widthScalar, 360 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftUp);
                     break;
                 case SelectOption.Answer1:
-                    MouseInterface.SetCursorPosition(500, 425);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 425 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftUp);
                     break;
                 case SelectOption.Answer2:
-                    MouseInterface.SetCursorPosition(500, 475);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 475 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftUp);
                     break;
                 case SelectOption.Answer3:
-                    MouseInterface.SetCursorPosition(500, 515);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 515 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftUp);
                     break;
                 case SelectOption.Answer4:
-                    MouseInterface.SetCursorPosition(500, 575);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 575 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftUp);
                     break;
                 case SelectOption.NextQuestion:
-                    MouseInterface.SetCursorPosition(500, 700);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 700 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
@@ -269,10 +267,21 @@ namespace AutomaticSmartRevise2
             return value;
         }
 
+        public void SetResolutionScalars()
+        {
+            //Get resolution of primary display
+            screenWidth = DisplayInterface.GetMainDisplaySize();
+            widthScalar = Convert.ToInt32(Math.Round((decimal)screenWidth.Width / 1920));
+            heightScalar = Convert.ToInt32(Math.Round((decimal)screenWidth.Height / 1080));
+            Console.WriteLine($"Display Width: {screenWidth.Width} Display Height: {screenWidth.Height}");
+        }
+
         public string[] SaveScreenshotsOfQuestionAndAnswers(string dirPath, bool enhancement = true)
         {
             Directory.CreateDirectory(dirPath);
             List<string> screenshotPaths= new List<string>();
+
+            //1920X1080 Template
             //Question:
             //  Y: 345-385 X:80-920 
             //Answer 1:
@@ -286,18 +295,18 @@ namespace AutomaticSmartRevise2
             //Next Question:
             //  Y: 700 X: 480
 
-            //Take screenshot of entirety of primary display.
-            Bitmap screenshot = new Bitmap(1920, 1080);
+            //Take screenshot of primary display.
+            Bitmap screenshot = new Bitmap(screenWidth.Width, screenWidth.Height);
             Graphics g = Graphics.FromImage(screenshot);
             g.CopyFromScreen(Point.Empty, Point.Empty, screenshot.Size);
             g.Dispose();
 
             //Define the crop areas
-            Rectangle questionCropArea = new Rectangle(40, 345, 920-80, 385-345);
-            Rectangle answer1CropArea = new Rectangle(40, 410, 920- 80, 435 - 395);
-            Rectangle answer2CropArea = new Rectangle(40, 460, 920- 80, 490 - 445);
-            Rectangle answer3CropArea = new Rectangle(40, 515, 920 - 80, 545 - 515);
-            Rectangle answer4CropArea = new Rectangle(40, 565, 920 - 80, 595 - 565);
+            Rectangle questionCropArea = new Rectangle(40 *widthScalar, 345 * heightScalar, (920-80) * widthScalar, (385-345) * heightScalar);
+            Rectangle answer1CropArea = new Rectangle(40 * widthScalar, 410 * heightScalar, (920 - 80) * widthScalar, (435 - 395) * heightScalar);
+            Rectangle answer2CropArea = new Rectangle(40 * widthScalar, 460 * heightScalar, (920 - 80) * widthScalar, (490 - 445) * heightScalar);
+            Rectangle answer3CropArea = new Rectangle(40 * widthScalar, 515 * heightScalar, (920 - 80) * widthScalar, (545 - 515) * heightScalar);
+            Rectangle answer4CropArea = new Rectangle(40 * widthScalar, 565 * heightScalar, (920 - 80) * widthScalar, (595 - 565) * heightScalar);
 
             Bitmap questionImageCrop = screenshot.Clone(questionCropArea, PixelFormat.Format32bppRgb);
             Bitmap answer1ImageCrop = screenshot.Clone(answer1CropArea, PixelFormat.Format32bppRgb);
