@@ -50,7 +50,7 @@ namespace AutomaticSmartRevise2
                 WebClient wc = new();
                 string zipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdataZip.zip");
                 //temporary discord hosting
-                wc.DownloadFile("https://cdn.discordapp.com/attachments/840827592177221652/1209946389271019560/tessData.zip?ex=65e8c562&is=65d65062&hm=487d97d38fc1464fa89634ba5a018b89bb68e7fac6a4b98d6752c4e61e1676bf&", zipPath);
+                wc.DownloadFile("https://cdn.discordapp.com/attachments/840827592177221652/1209946389271019560/tessData.zip?ex=6708d522&is=670783a2&hm=04cb72a2d35f31013d9bc1220c4705d0ea9a3498b12746f27166bae5c59f50e9&", zipPath);
                 ZipFile.ExtractToDirectory(zipPath, AppDomain.CurrentDomain.BaseDirectory, true);
                 File.Delete(zipPath);
                 Console.WriteLine("TessData downloaded.");
@@ -58,7 +58,7 @@ namespace AutomaticSmartRevise2
         }
         public void blabblahblah()
         {
-            
+
             Prerequisites();
             SetResolutionScalars();
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -72,7 +72,7 @@ namespace AutomaticSmartRevise2
                 "control of your computer for you.");
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
             Directory.CreateDirectory(tempImages);
-            for(int i = 0; i<count; i++)
+            for (int i = 0; i < count; i++)
             {
                 Console.ForegroundColor = ConsoleColor.Green;
                 //Measure time taken to solve;
@@ -85,7 +85,7 @@ namespace AutomaticSmartRevise2
                 var questiondata = SaveScreenshotsOfQuestionAndAnswers(tempPath);
 
                 string question = GetTextFromImage(questiondata[0]);
-                if(question == previousQuestion)
+                if (question == previousQuestion)
                 {
                     Directory.Delete(tempPath, true);
                     Task.Delay(1000).Wait();
@@ -161,10 +161,10 @@ namespace AutomaticSmartRevise2
 
         public void SelectAnswer(SelectOption option)
         {
-            switch(option)
+            switch (option)
             {
                 case SelectOption.Question:
-                    MouseInterface.SetCursorPosition(500*widthScalar, 360 * heightScalar);
+                    MouseInterface.SetCursorPosition(500 * widthScalar, 360 * heightScalar);
                     Task.Delay(100).Wait();
                     MouseInterface.MouseEvent(MouseInterface.MouseEventFlags.LeftDown);
                     Task.Delay(100).Wait();
@@ -252,7 +252,7 @@ namespace AutomaticSmartRevise2
                 {
                     Color pixelColor = input.GetPixel(x, y);
                     aTotal = new(aTotal.Key + pixelColor.A, aTotal.Value + 1);
-                    rTotal = new(rTotal.Key + pixelColor.R, rTotal.Value+1);
+                    rTotal = new(rTotal.Key + pixelColor.R, rTotal.Value + 1);
                     gTotal = new(gTotal.Key + pixelColor.G, gTotal.Value + 1);
                     bTotal = new(bTotal.Key + pixelColor.B, bTotal.Value + 1);
                 }
@@ -279,7 +279,7 @@ namespace AutomaticSmartRevise2
         public string[] SaveScreenshotsOfQuestionAndAnswers(string dirPath, bool enhancement = true)
         {
             Directory.CreateDirectory(dirPath);
-            List<string> screenshotPaths= new List<string>();
+            List<string> screenshotPaths = new List<string>();
 
             //1920X1080 Template
             //Question:
@@ -302,7 +302,7 @@ namespace AutomaticSmartRevise2
             g.Dispose();
 
             //Define the crop areas
-            Rectangle questionCropArea = new Rectangle(40 *widthScalar, 345 * heightScalar, (920-80) * widthScalar, (385-345) * heightScalar);
+            Rectangle questionCropArea = new Rectangle(40 * widthScalar, 345 * heightScalar, (920 - 80) * widthScalar, (385 - 345) * heightScalar);
             Rectangle answer1CropArea = new Rectangle(40 * widthScalar, 410 * heightScalar, (920 - 80) * widthScalar, (435 - 395) * heightScalar);
             Rectangle answer2CropArea = new Rectangle(40 * widthScalar, 460 * heightScalar, (920 - 80) * widthScalar, (490 - 445) * heightScalar);
             Rectangle answer3CropArea = new Rectangle(40 * widthScalar, 515 * heightScalar, (920 - 80) * widthScalar, (545 - 515) * heightScalar);
@@ -416,7 +416,7 @@ namespace AutomaticSmartRevise2
             //Try again if read fails
             foreach (tessnet2.Word word in result)
             {
-                Results += word.Text+" ";
+                Results += word.Text + " ";
             }
             result.Clear();
             ocr.Clear();
@@ -509,7 +509,8 @@ namespace AutomaticSmartRevise2
                 formattedstring = formattedstring[0].ToString();
             }
             catch (Exception ex) { }
-            if(formattedstring.Length == 0) {
+            if (formattedstring.Length == 0)
+            {
                 Console.WriteLine("Failed to parse answer from solving, retrying.");
                 //recursion might result in stack overflow :(
                 return await SendLLamaRequest(message);
