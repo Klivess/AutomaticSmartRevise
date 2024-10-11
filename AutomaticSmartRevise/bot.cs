@@ -50,7 +50,7 @@ namespace AutomaticSmartRevise2
                 WebClient wc = new();
                 string zipPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdataZip.zip");
                 //temporary discord hosting
-                wc.DownloadFile("https://cdn.discordapp.com/attachments/840827592177221652/1209946389271019560/tessData.zip?ex=6708d522&is=670783a2&hm=04cb72a2d35f31013d9bc1220c4705d0ea9a3498b12746f27166bae5c59f50e9&", zipPath);
+                wc.DownloadFile("https://github.com/Klivess/AutomaticSmartRevise/raw/refs/heads/master/tessData.zip", zipPath);
                 ZipFile.ExtractToDirectory(zipPath, AppDomain.CurrentDomain.BaseDirectory, true);
                 File.Delete(zipPath);
                 Console.WriteLine("TessData downloaded.");
